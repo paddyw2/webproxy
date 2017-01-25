@@ -26,13 +26,10 @@ public class WebProxy
             System.out.println("Socket initialization on port " + port
                     + "failed: " + e.getMessage());
         }
-
     }
 
     public void start()
     {
-
-        String clientRequest = "";
         connectedSocket = null;
         Scanner inputStream = null;
         PrintWriter outputStream = null;
@@ -46,7 +43,7 @@ public class WebProxy
              */
             try {
             // waits until a client connects
-            System.out.println("Waiting for client connection...");
+            System.out.println("Waiting for new client connection...");
             connectedSocket = serverSocket.accept();
             outputStream = new PrintWriter(new OutputStreamWriter(connectedSocket.getOutputStream(), "UTF-8"));
             inputStream = new Scanner(connectedSocket.getInputStream(), "UTF-8");
@@ -55,6 +52,8 @@ public class WebProxy
             }
 
             System.out.println("Connected to client");
+            outputStream.println("Enter your HTTP request:");
+            outputStream.flush();
 
             /*
              * Get/Serve Client HTTP Requests
@@ -89,8 +88,10 @@ public class WebProxy
                 /*
                  * If request, valid send it to server client
                  */
+
                 // process request
-                boolean requestIsValid = processRequest(clientRequest);
+                // boolean requestIsValid = processRequest(httpRequest);
+                boolean requestIsValid = true;
                 if(requestIsValid) {
                     outputStream.println("Proxy reponse: Valid request!");
                     outputStream.flush();
@@ -101,18 +102,22 @@ public class WebProxy
                         outputStream.println(str);
                         outputStream.flush();
                     }
-                    break;
                 } else {
                     outputStream.println("Proxy reponse: Invalid request!");
                     outputStream.flush();
                 }
-                clientRequest = "";
+                outputStream.println("Finished. Thank you!");
+                outputStream.flush();
+                try { 
+                    connectedSocket.close();
+                } catch (Exception e) {
+                    System.out.println("Error: " + e.getMessage());
+                }
+                break;
             }
-            break;
         }
 
         try {
-            connectedSocket.close();
             serverSocket.close();
         } catch (Exception e) {
             System.out.println("Socket close error: " + e.getMessage());

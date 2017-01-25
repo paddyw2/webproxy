@@ -41,7 +41,7 @@ public class ServerClient
             }
 
         } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
+            System.out.println("Finished serving file to client");
         }
 
         return responseList;
