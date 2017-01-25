@@ -52,7 +52,7 @@ public class WebProxy
             }
 
             System.out.println("Connected to client");
-            outputStream.println("Enter your HTTP request:");
+            outputStream.println("Enter your HTTP request (double return to submit):");
             outputStream.flush();
 
             /*
@@ -82,31 +82,46 @@ public class WebProxy
                 // print request
                 System.out.println("Received client request (list)");
                 // initialize client socket
-                proxyClient = new ServerClient("pages.cpsc.ucalgary.ca");
-
+                String host = httpRequest.get(1);
+                host = host.substring(6);
+                proxyClient = new ServerClient(host, 80);
+                if(proxyClient.failure()) {
+                    outputStream.println("HTTP/1.1 400 Bad Request");
+                    outputStream.flush();
+                    try { 
+                        connectedSocket.close();
+                    } catch (Exception e) {
+                        System.out.println("Error: " + e.getMessage());
+                    }
+                    break;
+                }
                 
                 /*
                  * If request, valid send it to server client
                  */
 
                 // process request
-                // boolean requestIsValid = processRequest(httpRequest);
-                boolean requestIsValid = true;
+                boolean requestIsValid = processRequest(httpRequest);
                 if(requestIsValid) {
-                    outputStream.println("Proxy reponse: Valid request!");
-                    outputStream.flush();
                     // get the request response, and send to
                     // original client
                     LinkedList<String> response = proxyClient.getReponse(httpRequest);
-                    for(String str : response) {
-                        outputStream.println(str);
+                    String firstLine = response.getFirst();
+                    if(firstLine.equals("HTTP/1.1 200 OK")) {
+                        for(String str : response) {
+                            outputStream.println(str);
+                            outputStream.flush();
+                        }
+                    } else {
+                        outputStream.println("HTTP/1.1 400 Bad Request");
                         outputStream.flush();
                     }
+
                 } else {
-                    outputStream.println("Proxy reponse: Invalid request!");
+                    outputStream.println("HTTP/1.1 400 Bad Request");
                     outputStream.flush();
                 }
-                outputStream.println("Finished. Thank you!");
+                outputStream.println("\nFinished. Thank you!");
                 outputStream.flush();
                 try { 
                     connectedSocket.close();
@@ -125,13 +140,18 @@ public class WebProxy
         System.out.println("Server received termination signal - exiting");
     }
 
-    public boolean processRequest(String request)
+    public boolean processRequest(LinkedList<String> request)
     {
         // if request valid, send to proxy client
         System.out.println("Processing client request...");
 
-        // presume valid request
-        return true;
+        // check that first letters are GET
+        String firstLine = request.getFirst();
+        String getPart = firstLine.substring(0,3);
+        if(getPart.equals("GET"))
+            return true;
+        else
+            return false;
     }
 
     public static void main(String[] args)

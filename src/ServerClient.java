@@ -8,15 +8,24 @@ public class ServerClient
 {
     private Socket socket;
     private String server;
-    public ServerClient(String server)
+    public ServerClient(String server, int port)
     {
         System.out.println("Creating server client!");
         this.server = server;
+        socket = null;
         try {
-            socket = new Socket(server, 80);
+            socket = new Socket(server, port);
         } catch (Exception e) {
             System.out.println("Socket initialization error");
         }
+    }
+
+    public boolean failure()
+    {
+        if(socket == null)
+            return true;
+        else
+            return false;
     }
 
     public LinkedList<String> getReponse(LinkedList<String> requestList)
