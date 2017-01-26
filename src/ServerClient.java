@@ -10,7 +10,6 @@ public class ServerClient
     private String server;
     public ServerClient(String server, int port)
     {
-        System.out.println("Creating server client!");
         this.server = server;
         socket = null;
         try {
@@ -30,6 +29,8 @@ public class ServerClient
 
     public LinkedList<String> getReponse(LinkedList<String> requestList)
     {
+        // sends the HTTP request to the desired server
+        // and returns the response
         String request = "";
         for(String str : requestList)
         {
