@@ -90,8 +90,7 @@ public class WebProxy
                     httpRequest.add(userInput);
                     System.out.println(userInput);
                 } catch (Exception e) {
-                    System.out.println("No input found");
-                    System.out.println(e.getMessage());
+                    System.out.println("No request received, closing connection");
                     quitProgram = true;
                     break;
                 }
