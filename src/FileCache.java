@@ -29,7 +29,7 @@ public class FileCache
             return false;
     }
 
-    public LinkedList<String> getResponse(LinkedList<String> request)
+    public byte[] getResponse(LinkedList<String> request)
     {
         System.out.println("Responding from cache");
         String path = request.get(0);
@@ -40,7 +40,7 @@ public class FileCache
         return readFile(filepath);
     }
 
-    public void saveNewResponse(LinkedList<String> request, LinkedList<String> response)
+    public void saveNewResponse(LinkedList<String> request, byte[] response)
     {
         String path = request.get(0);
         int len = path.length() - 9;
@@ -49,7 +49,7 @@ public class FileCache
         writeFile(filepath, response);
     }
 
-    public void writeFile(String path, LinkedList<String> response)
+    public void writeFile(String path, byte[] data)
     {
         File file = null;
         // check path is correct
@@ -67,12 +67,10 @@ public class FileCache
 
         // try writing file
         try {
-            FileWriter fileOb = new FileWriter(file);
-            BufferedWriter buff = new BufferedWriter(fileOb);
-            for(String str : response) {
-                buff.write(str + "\r\n");
-            }
-            buff.close();
+            FileOutputStream fileStream = new FileOutputStream(file);
+            DataOutputStream dataStream = new DataOutputStream(fileStream);
+            dataStream.write(data);
+            dataStream.close();
             System.out.println("HTTP response successfully cached at:\n" + path);
         } catch (Exception e) {
             // handle any exceptions
@@ -81,29 +79,30 @@ public class FileCache
         }
     }
 
-    public LinkedList<String> readFile(String filePath)
+    public byte[] readFile(String filePath)
     {
-        LinkedList<String> response = new LinkedList<String>();
-        FileReader file = null;
+        byte[] data = null;
+        File file = null;
         // check path is correct
         try {
-            file = new FileReader(filePath);
+            file = new File(filePath);
         } catch (Exception e) {
             System.out.println("Invalid file path");
         }
         // try reading file
         String eachLine = null;
         try {
-            BufferedReader buff = new BufferedReader(file);
-            while((eachLine = buff.readLine()) != null) {
-                response.add(eachLine); 
-            }
+            data = new byte[(int) file.length()];
+            FileInputStream fileStream = new FileInputStream(file);
+            DataInputStream dataStream = new DataInputStream(fileStream);
+            dataStream.read(data);
+            dataStream.close();
         } catch (Exception e) {
             // handle any exceptions
             System.out.println("Exception triggered");
             System.out.println("Message: "+e.getMessage());
         }
         // return saved HTTP response
-        return response;
+        return data;
     }
 }

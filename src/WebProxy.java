@@ -9,6 +9,7 @@ import java.util.Scanner;
 import java.util.LinkedList;
 import java.io.PrintWriter;
 import java.io.OutputStreamWriter;
+import java.io.BufferedOutputStream;
 
 public class WebProxy
 {
@@ -17,6 +18,7 @@ public class WebProxy
     private ServerClient proxyClient;
     private PrintWriter outputStream;
     private FileCache cache;
+    private BufferedOutputStream byteOutput;
 
     public WebProxy(int port)
     {
@@ -56,6 +58,8 @@ public class WebProxy
                 connectedSocket = serverSocket.accept();
                 outputStream = new PrintWriter(new OutputStreamWriter(connectedSocket.getOutputStream(),"UTF-8"));
                 inputStream = new Scanner(connectedSocket.getInputStream(),"UTF-8");
+                // for bytes
+                byteOutput = new BufferedOutputStream(connectedSocket.getOutputStream());
             } catch (Exception e) {
                 System.out.println("Socket failed to connect with client");
             }
@@ -71,11 +75,26 @@ public class WebProxy
             LinkedList<String> httpRequest = new LinkedList<String>();
             System.out.println("Waiting for client request...");
 
+            String userInput = "";
             while(true) {
                 // wait for client request
-                String userInput = inputStream.nextLine();
-                httpRequest.add(userInput);
-                System.out.println(userInput);
+                try {
+                    userInput = inputStream.nextLine();
+                    // remove any keep-alive requests
+                    // and change to close
+                    if(userInput.length() > 10) {
+                        String end = userInput.substring(userInput.length()-10);
+                        if(end.equals("keep-alive"))
+                            userInput = userInput.substring(0,12) + "close";
+                    }
+                    httpRequest.add(userInput);
+                    System.out.println(userInput);
+                } catch (Exception e) {
+                    System.out.println("No input found");
+                    System.out.println(e.getMessage());
+                    quitProgram = true;
+                    break;
+                }
                 // if user enters a blank line, this
                 // indicates end of message
                 // if they enter quit, then
@@ -112,23 +131,18 @@ public class WebProxy
                 // origin or cache, and send back
                 // to original client
                 boolean fileInCache = cache.fileInCache(httpRequest);
-                byte[] response;
-                fileInCache = false;
+                byte[] response = new byte[10];
                 if(fileInCache) {
                     response = cache.getResponse(httpRequest);
                     System.out.println("Successfully served file from cache");
                 } else {
                     response = proxyClient.getReponse(httpRequest);
+                    cache.saveNewResponse(httpRequest, response);
                 }
                 // if response is not 200 OK, return 400
-                //String firstLine = response.getFirst();
-                if(firstLine.equals("HTTP/1.1 200 OK")) {
+                if(true){//firstLine.equals("HTTP/1.1 200 OK")) {
                     // print response to client
-                    for(String str : response) {
-                        printToClient(str);
-                    }
-                    //if(!fileInCache)
-                        //cache.saveNewResponse(httpRequest, response);
+                    printByteClient(response);
                 } else {
                     printToClient("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n400");
                 }
@@ -191,8 +205,13 @@ public class WebProxy
 
     public void printByteClient(byte[] message)
     {
-        outputStream.println(message);
-        outputStream.flush();
+        try {
+            byteOutput.write(message);
+            byteOutput.flush();
+        } catch (Exception e) {
+            System.out.println("Byte output error");
+            System.out.println(e.getMessage());
+        }
     }
 
     public static void main(String[] args)
