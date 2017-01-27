@@ -45,6 +45,7 @@ public class WebProxy
         Scanner inputStream = null;
         outputStream = null;
         boolean quitProgram = false;
+        boolean saveToCache = true;
         // run server indefinitely
         while(true)
         {
@@ -62,7 +63,7 @@ public class WebProxy
             // once client is connected, print message
             // to their screen
             System.out.println("Connected to client");
-            printToClient("Enter your HTTP request (double return to submit):");
+            //printToClient("Enter your HTTP request (double return to submit):");
 
             /* Get/Serve Client HTTP Requests */
 
@@ -74,6 +75,7 @@ public class WebProxy
                 // wait for client request
                 String userInput = inputStream.nextLine();
                 httpRequest.add(userInput);
+                System.out.println(userInput);
                 // if user enters a blank line, this
                 // indicates end of message
                 // if they enter quit, then
@@ -110,24 +112,29 @@ public class WebProxy
                 // origin or cache, and send back
                 // to original client
                 boolean fileInCache = cache.fileInCache(httpRequest);
-                LinkedList<String> response;
-                if(fileInCache)
+                byte[] response;
+                fileInCache = false;
+                if(fileInCache) {
                     response = cache.getResponse(httpRequest);
-                 else
+                    System.out.println("Successfully served file from cache");
+                } else {
                     response = proxyClient.getReponse(httpRequest);
+                }
                 // if response is not 200 OK, return 400
-                String firstLine = response.getFirst();
+                //String firstLine = response.getFirst();
                 if(firstLine.equals("HTTP/1.1 200 OK")) {
                     // print response to client
                     for(String str : response) {
                         printToClient(str);
                     }
+                    //if(!fileInCache)
+                        //cache.saveNewResponse(httpRequest, response);
                 } else {
-                    printToClient("HTTP/1.1 400 Bad Request");
+                    printToClient("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n400");
                 }
             } else {
                 // if invalid request, respond 400
-                printToClient("HTTP/1.1 400 Bad Request");
+                printToClient("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n400");
             }
             // terminate client connection and wait for
             // new client
@@ -166,8 +173,8 @@ public class WebProxy
 
     public void closeConnection(String message)
     {
-        outputStream.println(message);
-        outputStream.flush();
+        //outputStream.println(message);
+        //outputStream.flush();
 
         try {
             connectedSocket.close();
@@ -177,6 +184,12 @@ public class WebProxy
     }
 
     public void printToClient(String message)
+    {
+        outputStream.println(message);
+        outputStream.flush();
+    }
+
+    public void printByteClient(byte[] message)
     {
         outputStream.println(message);
         outputStream.flush();

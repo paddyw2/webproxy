@@ -27,7 +27,7 @@ public class ServerClient
             return false;
     }
 
-    public LinkedList<String> getReponse(LinkedList<String> requestList)
+    public byte[] getReponse(LinkedList<String> requestList)
     {
         // sends the HTTP request to the desired server
         // and returns the response
@@ -38,23 +38,21 @@ public class ServerClient
             request = request + str + "\r\n";
         }
         request = request + "\r\n";
-        LinkedList<String> responseList = new LinkedList<String>();
-        String response = "";
+        byte[] data = new byte[16384];
+        int endInput = 0;
         try {
             PrintWriter outputStream = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
             Scanner inputStream = new Scanner(socket.getInputStream(), "UTF-8");
             outputStream.println(request);
             outputStream.flush();
-            while(true) {
-                response = inputStream.nextLine();
-                responseList.add(response);
+            while(endInput != -1) {
+                endInput = inputStream.read(data);
             }
-
         } catch (Exception e) {
             System.out.println("Finished serving file to client");
         }
 
-        return responseList;
+        return data;
     }
 }
 
