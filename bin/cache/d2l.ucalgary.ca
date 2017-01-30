@@ -1,6 +1,0 @@
-HTTP/1.0 302 Found
-Location: https://d2l.ucalgary.cahttp://d2l.ucalgary.ca/
-Server: BigIP
-Connection: close
-Content-Length: 0
-
