@@ -15,7 +15,18 @@ public class FileCache
         // i.e. pages.cpsc.ucalgary.ca/~cryiac.james/sample.txt
         String path = request.get(0);
         int len = path.length() - 9;
-        path = path.substring(11, len); 
+        if(path.substring(4,9).equals("http:")) {
+            System.out.println("Regular...");
+            path = path.substring(11, len); 
+        } else if (path.substring(4,9).equals("https")) {
+            System.out.println("Secure...");
+            path = path.substring(12, len); 
+        } else {
+            path = path.substring(4, len);
+            String domain = request.get(1);
+            domain = domain.substring(6);
+            path = domain + path;
+        }
         String filepath = System.getProperty("user.dir") + "/cache/" + path;
         File checkCache = null;
         try {
@@ -34,7 +45,14 @@ public class FileCache
         System.out.println("Responding from cache");
         String path = request.get(0);
         int len = path.length() - 9;
-        path = path.substring(11, len); 
+        if(path.substring(4,8).equals("http")) {
+            path = path.substring(11, len); 
+        } else {
+            path = path.substring(4, len);
+            String domain = request.get(1);
+            domain = domain.substring(6);
+            path = domain + path;
+        }
         String filepath = System.getProperty("user.dir") + "/cache/" + path;
         System.out.println("Serving file from cache");
         return readFile(filepath);

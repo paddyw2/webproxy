@@ -6,11 +6,11 @@ import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.ByteArrayOutputStream;
 
-public class ServerClient
+public class ProxyClient
 {
     private Socket socket;
     private String server;
-    public ServerClient(String server, int port)
+    public ProxyClient(String server, int port)
     {
         this.server = server;
         socket = null;
@@ -66,4 +66,3 @@ public class ServerClient
         return data;
     }
 }
-

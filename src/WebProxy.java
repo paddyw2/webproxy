@@ -15,13 +15,18 @@ public class WebProxy
 {
     private ServerSocket serverSocket;
     private Socket connectedSocket;
-    private ServerClient proxyClient;
+    private ProxyClient proxyClient;
     private PrintWriter outputStream;
+    private Scanner inputStream;
     private FileCache cache;
     private BufferedOutputStream byteOutput;
 
+
     public WebProxy(int port)
     {
+        connectedSocket = null;
+        inputStream = null;
+        outputStream = null;
         cache = new FileCache();
         // initialize server listening port
         serverSocket = null;
@@ -43,89 +48,37 @@ public class WebProxy
      */
     public void start()
     {
-        connectedSocket = null;
-        Scanner inputStream = null;
-        outputStream = null;
-        boolean quitProgram = false;
-        boolean saveToCache = true;
         // run server indefinitely
         while(true)
         {
             /* Get Client Connection */
 
-            try {
-                System.out.println("Waiting for new client connection...");
-                connectedSocket = serverSocket.accept();
-                outputStream = new PrintWriter(new OutputStreamWriter(connectedSocket.getOutputStream(),"UTF-8"));
-                inputStream = new Scanner(connectedSocket.getInputStream(),"UTF-8");
-                // for bytes
-                byteOutput = new BufferedOutputStream(connectedSocket.getOutputStream());
-            } catch (Exception e) {
-                System.out.println("Socket failed to connect with client");
-            }
-
-            // once client is connected, print message
-            // to their screen
+            getClientConnection();
             System.out.println("Connected to client");
-            //printToClient("Enter your HTTP request (double return to submit):");
 
             /* Get/Serve Client HTTP Requests */
 
             // wait for requests from the client
-            LinkedList<String> httpRequest = new LinkedList<String>();
             System.out.println("Waiting for client request...");
-
-            String userInput = "";
-            while(true) {
-                // wait for client request
-                try {
-                    userInput = inputStream.nextLine();
-                    // remove any keep-alive requests
-                    // and change to close
-                    if(userInput.length() > 10) {
-                        String end = userInput.substring(userInput.length()-10);
-                        if(end.equals("keep-alive"))
-                            userInput = userInput.substring(0,12) + "close";
-                    }
-                    httpRequest.add(userInput);
-                    System.out.println(userInput);
-                } catch (Exception e) {
-                    System.out.println("No request received, closing connection");
-                    quitProgram = true;
-                    break;
-                }
-                // if user enters a blank line, this
-                // indicates end of message
-                // if they enter quit, then
-                // exit connection
-                if(userInput.equals("")) {
-                    break;
-                } else if(userInput.equals("quit")) {
-                    System.out.println("Terminating");
-                    quitProgram = true;
-                    break;
-                }
-            }
+            LinkedList<String> httpRequest = getClientRequest();
             
             /* Quit */ 
-
             // if user chose to quit
-            if(quitProgram) {
-                closeConnection("Termination signal received");
-                quitProgram = false;
+            if(httpRequest.getFirst().equals("terminate")) {
+                closeConnection();
                 continue;
+            } else {
+                // confirm request received 
+                System.out.println("Received client request");
             }
 
             /* Validate request, send to server client */
 
-            // confirm request received 
-            System.out.println("Received client request");
-
             // process request and create proxy client
-            boolean createProxy = createProxy(httpRequest);
+            boolean createProxyClient = createProxyClient(httpRequest);
             boolean requestIsValid = processRequest(httpRequest);
             // if both successfull, get response
-            if(requestIsValid && createProxy) {
+            if(requestIsValid && createProxyClient) {
                 // get the request response from eiter
                 // origin or cache, and send back
                 // to original client
@@ -138,28 +91,82 @@ public class WebProxy
                     response = proxyClient.getReponse(httpRequest);
                     cache.saveNewResponse(httpRequest, response);
                 }
+                // parse binary response to check for 200 message
+                String stringResponse = new String(response);
+                String firstLine = "";
+                if(stringResponse.length() > 15)
+                    firstLine = stringResponse.substring(0,15);
                 // if response is not 200 OK, return 400
-                if(true){//firstLine.equals("HTTP/1.1 200 OK")) {
-                    // print response to client
-                    printByteClient(response);
+                if(firstLine.equals("HTTP/1.1 200 OK")) {
+                    // send response to original client
+                    sendByteClient(response);
                 } else {
-                    printToClient("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n400");
+                    printToClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request");
                 }
             } else {
                 // if invalid request, respond 400
-                printToClient("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n400");
+                    printToClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request");
             }
             // terminate client connection and wait for
             // new client
-            closeConnection("\nFinished. Thank you!");
+            closeConnection();
         }
+    }
+
+    public void getClientConnection()
+    {
+        try {
+            System.out.println("Waiting for new client connection...");
+            connectedSocket = serverSocket.accept();
+            outputStream = new PrintWriter(new OutputStreamWriter(connectedSocket.getOutputStream(),"UTF-8"));
+            inputStream = new Scanner(connectedSocket.getInputStream(),"UTF-8");
+            // for bytes
+            byteOutput = new BufferedOutputStream(connectedSocket.getOutputStream());
+        } catch (Exception e) {
+            System.out.println("Socket failed to connect with client");
+        }
+    }
+
+    public LinkedList<String> getClientRequest()
+    {
+        LinkedList<String> httpRequest = new LinkedList<String>();
+        while(true) {
+            String userInput = "";
+            try {
+                userInput = inputStream.nextLine();
+                // remove any keep-alive requests
+                // and change to close
+                if(userInput.length() > 10) {
+                    String end = userInput.substring(userInput.length()-10);
+                    if(end.equals("keep-alive"))
+                        userInput = userInput.substring(0,12) + "close";
+                }
+                httpRequest.add(userInput);
+                System.out.println(userInput);
+            } catch (Exception e) {
+                System.out.println("No request received, closing connection");
+                httpRequest.addFirst("terminate");
+                break;
+            }
+            // if user enters a blank line, this
+            // indicates end of message
+            // if they enter quit, then
+            // exit connection
+            if(userInput.equals("")) {
+                break;
+            } else if(userInput.equals("quit")) {
+                System.out.println("Terminating");
+                httpRequest.addFirst("terminate");
+                break;
+            }
+        }
+        return httpRequest;
     }
 
     public boolean processRequest(LinkedList<String> request)
     {
         // if request valid, send to proxy client
         System.out.println("Processing client request...");
-
 
         // check that first letters are GET
         String firstLine = request.getFirst();
@@ -170,25 +177,22 @@ public class WebProxy
             return false;
     }
 
-    public boolean createProxy(LinkedList<String> request)
+    public boolean createProxyClient(LinkedList<String> request)
     {
         // initialize client socket, by
         // getting host from HTTP request
         try {
             String host = request.get(1);
             host = host.substring(6);
-            proxyClient = new ServerClient(host, 80);
+            proxyClient = new ProxyClient(host, 80);
         } catch (Exception e) {
             return false;
         }
         return true;
     }
 
-    public void closeConnection(String message)
+    public void closeConnection()
     {
-        //outputStream.println(message);
-        //outputStream.flush();
-
         try {
             connectedSocket.close();
         } catch (Exception e) {
@@ -202,7 +206,7 @@ public class WebProxy
         outputStream.flush();
     }
 
-    public void printByteClient(byte[] message)
+    public void sendByteClient(byte[] message)
     {
         try {
             byteOutput.write(message);
