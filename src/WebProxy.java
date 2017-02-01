@@ -1,7 +1,24 @@
-/* Assignment 1 - CPSC 441
+/*  Assignment 1 - CPSC 441
  *  Author: Patrick Withams
  *  Date: 23/1/2017
- *  Description: A simple Java web server
+ *
+ *  Program Description: A simple Java proxy web server
+ *  which takes an HTTP request as input and if
+ *  the file is in the local cache, serve from
+ *  there. If not, get response from original
+ *  server.
+ *
+ *  Limitations: Does not work with HTTPS, and
+ *  any request that does not generate a 200
+ *  OK response is responded with 400 Bad
+ *  Request. Proxy assumes that request has
+ *  a host line.
+ *
+ *  Class: WebProxy
+ *  Description: Contains main logic for web proxy
+ *  server. This includes running server, waiting
+ *  for cient connections, parsing connections,
+ *  sending requests to cache/proxy client etc.
  */
 
 import java.net.*;
@@ -38,8 +55,8 @@ public class WebProxy
     /*
      * Waits for a client to connect, then waits
      * for their request. When the request is
-     * received, or if they quit, their response
-     * is served and their connection terminated,
+     * received their response is served
+     * and their connection terminated,
      * and the server loops back waiting for
      * another connection
      */
@@ -59,50 +76,63 @@ public class WebProxy
             System.out.println("Waiting for client request...");
             LinkedList<String> httpRequest = getClientRequest();
             
-            /* Quit */ 
-            // if user chose to quit
+            // if get request failed (timed out),
+            // terminate client connection
             if(httpRequest.getFirst().equals("terminate")) {
                 closeConnection();
                 continue;
             } else {
-                // confirm request received 
+                // otherwise, confirm request received 
                 System.out.println("Received client request");
             }
 
             /* Validate request, send to server client */
 
             // process request and create proxy client
-            boolean createProxyClient = createProxyClient(httpRequest);
             boolean requestIsValid = processRequest(httpRequest);
+            boolean createProxyClient = createProxyClient(httpRequest);
+
             // if both successfull, get response
             if(requestIsValid && createProxyClient) {
-                // get the request response from eiter
-                // origin or cache, and send back
-                // to original client
+
+                // check if file in cache
                 boolean fileInCache = cache.fileInCache(httpRequest);
-                byte[] response = new byte[10];
+                byte[] response = new byte[1024];
+                
+                /* Get Response */
+
+                // if in cache, get binary response from cache
                 if(fileInCache) {
                     response = cache.getResponse(httpRequest);
                     System.out.println("Successfully served file from cache");
                 } else {
+                    // otherwise, send request to proxy client
+                    // to obtain binary response from origin server
                     response = proxyClient.getReponse(httpRequest);
+                    // save in cache for future requests
                     cache.saveNewResponse(httpRequest, response);
                 }
+                
+                /* Parse Response and Send to Client */
+
                 // parse binary response to check for 200 message
                 String stringResponse = new String(response);
                 String firstLine = "";
+
+                // get first line of 200 header
                 if(stringResponse.length() > 15)
                     firstLine = stringResponse.substring(0,15);
-                // if response is not 200 OK, return 400
+
                 if(firstLine.equals("HTTP/1.1 200 OK")) {
-                    // send response to original client
+                    // if 200, send response to original client
                     sendByteClient(response);
                 } else {
-                    sendStringClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request\r\n");
+                    // if response is not 200 OK, return 400
+                    respondBadRequest();
                 }
             } else {
                 // if invalid request, respond 400
-                    sendStringClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request\r\n");
+                respondBadRequest();
             }
             // terminate client connection and wait for
             // new client
@@ -112,6 +142,9 @@ public class WebProxy
 
     public void getClientConnection()
     {
+        // waits for client connection and creates
+        // input/output stream objects to communicate
+        // with client
         try {
             System.out.println("Waiting for new client connection...");
             // wait for client connection
@@ -127,14 +160,16 @@ public class WebProxy
 
     public LinkedList<String> getClientRequest()
     {
+        // waits for client request, printing each
+        // line for reference
+        // the request is ended when a double return
+        // (i.e. blank line) is received
         LinkedList<String> httpRequest = new LinkedList<String>();
         while(true) {
             String userInput = "";
             try {
                 // get user input line
                 userInput = inputStream.nextLine();
-                // remove any keep-alive requests
-                // and change to close
                 if(userInput.length() > 10) {
                     String end = userInput.substring(userInput.length()-10);
                     if(end.equals("keep-alive"))
@@ -153,24 +188,16 @@ public class WebProxy
             }
             // if user enters a blank line, this
             // indicates end of request
-            // if they enter quit, then
-            // exit connection
-            if(userInput.equals("")) {
+            if(userInput.equals(""))
                 break;
-            } else if(userInput.equals("quit")) {
-                System.out.println("Terminating");
-                // add terminate keyword to trigger
-                // connection close
-                httpRequest.addFirst("terminate");
-                break;
-            }
         }
         return httpRequest;
     }
 
     public boolean processRequest(LinkedList<String> request)
     {
-        // if request valid, send to proxy client
+        // checks if first letters of response are "GET"
+        // this proxy does not accept other requests
         System.out.println("Processing client request...");
 
         // get first three letters of request
@@ -188,8 +215,25 @@ public class WebProxy
     {
         // initialize client socket, by
         // getting host from HTTP request
+
+        // search for host line
+        int hostIndex = 0;
+        boolean hostNotFound = true;
+        for(String line : request) {
+            if(line.length() > 4) {
+                if(line.substring(0,4).equals("Host")) {
+                    hostNotFound = false;
+                    break;
+                }
+            }
+            hostIndex++;
+        }
+
+        if(hostNotFound)
+            return false;
+
         try {
-            String host = request.get(1);
+            String host = request.get(hostIndex);
             host = host.substring(6);
             proxyClient = new ProxyClient(host, 80);
         } catch (Exception e) {
@@ -208,11 +252,12 @@ public class WebProxy
         }
     }
 
-    public void sendStringClient(String message)
+    public void respondBadRequest()
     {
         // converts string message to byte array
         // then sends to client
-        byte[] byteString = message.getBytes();
+        String response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request\r\n";
+        byte[] byteString = response.getBytes();
         sendByteClient(byteString);
     }
 

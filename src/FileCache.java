@@ -1,13 +1,19 @@
+/*  Assignment 1 - CPSC 441
+ *  Author: Patrick Withams
+ *  Date: 23/1/2017
+ *
+ *  Class: FileCache
+ *  Description: Deals with reading/writing HTTP
+ *  requests and responses to the local cache.
+ *  Also is able to check if a request can be
+ *  served from cache.
+ */
+
 import java.io.*;
 import java.util.LinkedList;
 
 public class FileCache
 {
-    public FileCache()
-    {
-
-    }
-
     public boolean fileInCache(LinkedList<String> request)
     {
         // search directory for file matching the
@@ -16,7 +22,7 @@ public class FileCache
 
         // get filepath
         String path = parseRequest(request);
-        String filepath = System.getProperty("user.dir") + "/cache/" + path;
+        String filepath = System.getProperty("user.dir") + "/" + path;
         // check if file exits already, which indicates
         // file in cache
         File checkCache = null;
@@ -37,7 +43,7 @@ public class FileCache
         // of the requested file in cache
         System.out.println("Responding from cache");
         String path = parseRequest(request);
-        String filepath = System.getProperty("user.dir") + "/cache/" + path;
+        String filepath = System.getProperty("user.dir") + "/" + path;
         System.out.println("Serving file from cache");
         return readFile(filepath);
     }
@@ -47,7 +53,8 @@ public class FileCache
         // takes a http request, and saves the response
         // to file
         String path = parseRequest(request);
-        String filepath = System.getProperty("user.dir") + "/cache/" + path;
+        String filepath = System.getProperty("user.dir") + "/" + path;
+        response = forceCloseConnection(response);
         writeFile(filepath, response);
     }
 
@@ -128,10 +135,60 @@ public class FileCache
         } else {
             // from telnet/manual request
             path = path.substring(4, len);
-            String domain = request.get(1);
+
+            // search for host line
+            int hostIndex = 0;
+            for(String line : request) {
+                if(line.substring(0,4).equals("Host"))
+                    break;
+                hostIndex++;
+            }
+            // extract host value
+            String domain = request.get(hostIndex);
             domain = domain.substring(6);
             path = domain + path;
         }
         return path;
+    }
+
+    public byte[] forceCloseConnection(byte[] response)
+    {
+        System.out.println("Forcing close connection");
+        int breakPoint = 0;
+        for(int i=0;i<response.length;i++)
+        {
+            if(response[i] == '\r' && response[i+1] == '\n' &&
+                    response[i+2] == '\r' && response[i+3] == '\n') {
+                breakPoint = i+4;
+                break;
+             }
+        }
+        int bodySize = response.length - breakPoint;
+        byte[] header = new byte[breakPoint];
+        byte[] body = new byte[bodySize];
+
+        for(int i=0;i<breakPoint;i++) {
+            header[i] = response[i];
+        }
+
+        int counter = 0;
+        for(int i=breakPoint;i<response.length;i++) {
+            body[counter] = response[i];
+            counter++;
+        }
+
+        String headerString = new String(header);
+        String newHeader = headerString.replace("Connection: keep-alive", "Connection: close");
+        header = newHeader.getBytes();
+        byte[] updatedArray = new byte[response.length];
+
+        for(int i=0;i<response.length;i++) {
+            if(i<breakPoint)
+                updatedArray[i] = header[i];
+            else
+                updatedArray[i] = body[i-breakPoint];
+        }
+
+        return updatedArray;
     }
 }

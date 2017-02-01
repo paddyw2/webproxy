@@ -1,3 +1,13 @@
+/*  Assignment 1 - CPSC 441
+ *  Author: Patrick Withams
+ *  Date: 23/1/2017
+ *
+ *  Class: ProxyClient
+ *  Description: Forwards a HTTP request
+ *  to the origin server if requested
+ *  object is not in local cache.
+ */
+
 import java.net.*;
 import java.util.Scanner;
 import java.util.LinkedList;
@@ -10,8 +20,12 @@ public class ProxyClient
 {
     private Socket socket;
     private String server;
+
     public ProxyClient(String server, int port)
     {
+        // try to create a server socket
+        // from the given host name and port
+        // number
         this.server = server;
         socket = null;
         try {
@@ -23,6 +37,8 @@ public class ProxyClient
 
     public boolean failure()
     {
+        // check if socket initialized
+        // successfully
         if(socket == null)
             return true;
         else
@@ -33,6 +49,9 @@ public class ProxyClient
     {
         // sends the HTTP request to the desired server
         // and returns the response in a byte array
+
+        // create a single string with \r\n line breaks
+        // out of request string list
         String request = "";
         for(String str : requestList)
         {
@@ -42,15 +61,19 @@ public class ProxyClient
         request = request + "\r\n";
 
         // create binary storage buffer and array
+        // to store response from origin server
         byte[] data = new byte[1024];
         ByteArrayOutputStream store =  new ByteArrayOutputStream();
         int endInput = 0;
+
+        // try to send request and receive response
         try {
             // send request to client as a string
             PrintWriter outputStream = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
             InputStream inputStream = socket.getInputStream();
             outputStream.println(request);
             outputStream.flush();
+
             // receive request from client as binary
             while(endInput > -1) {
                 endInput = inputStream.read(data);
