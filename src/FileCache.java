@@ -13,21 +13,12 @@ public class FileCache
         // search directory for file matching the
         // format "hostname, filepath""
         // i.e. pages.cpsc.ucalgary.ca/~cryiac.james/sample.txt
-        String path = request.get(0);
-        int len = path.length() - 9;
-        if(path.substring(4,9).equals("http:")) {
-            System.out.println("Regular...");
-            path = path.substring(11, len); 
-        } else if (path.substring(4,9).equals("https")) {
-            System.out.println("Secure...");
-            path = path.substring(12, len); 
-        } else {
-            path = path.substring(4, len);
-            String domain = request.get(1);
-            domain = domain.substring(6);
-            path = domain + path;
-        }
+
+        // get filepath
+        String path = parseRequest(request);
         String filepath = System.getProperty("user.dir") + "/cache/" + path;
+        // check if file exits already, which indicates
+        // file in cache
         File checkCache = null;
         try {
             checkCache = new File(filepath);
@@ -42,17 +33,10 @@ public class FileCache
 
     public byte[] getResponse(LinkedList<String> request)
     {
+        // takes http request, and returns a byte array
+        // of the requested file in cache
         System.out.println("Responding from cache");
-        String path = request.get(0);
-        int len = path.length() - 9;
-        if(path.substring(4,8).equals("http")) {
-            path = path.substring(11, len); 
-        } else {
-            path = path.substring(4, len);
-            String domain = request.get(1);
-            domain = domain.substring(6);
-            path = domain + path;
-        }
+        String path = parseRequest(request);
         String filepath = System.getProperty("user.dir") + "/cache/" + path;
         System.out.println("Serving file from cache");
         return readFile(filepath);
@@ -60,9 +44,9 @@ public class FileCache
 
     public void saveNewResponse(LinkedList<String> request, byte[] response)
     {
-        String path = request.get(0);
-        int len = path.length() - 9;
-        path = path.substring(11, len); 
+        // takes a http request, and saves the response
+        // to file
+        String path = parseRequest(request);
         String filepath = System.getProperty("user.dir") + "/cache/" + path;
         writeFile(filepath, response);
     }
@@ -70,7 +54,8 @@ public class FileCache
     public void writeFile(String path, byte[] data)
     {
         File file = null;
-        // check path is correct
+        // check path is correct and that
+        // it does not already exist
         try {
             file = new File(path);
             file.getParentFile().mkdirs();
@@ -83,7 +68,7 @@ public class FileCache
             System.out.println("Invalid file path");
         }
 
-        // try writing file
+        // try writing data byte array to file
         try {
             FileOutputStream fileStream = new FileOutputStream(file);
             DataOutputStream dataStream = new DataOutputStream(fileStream);
@@ -93,7 +78,7 @@ public class FileCache
         } catch (Exception e) {
             // handle any exceptions
             System.out.println("Exception triggered");
-            System.out.println("Message: "+e.getMessage());
+            System.out.println("Message: " + e.getMessage());
         }
     }
 
@@ -107,7 +92,7 @@ public class FileCache
         } catch (Exception e) {
             System.out.println("Invalid file path");
         }
-        // try reading file
+        // try reading file into byte array
         String eachLine = null;
         try {
             data = new byte[(int) file.length()];
@@ -120,7 +105,33 @@ public class FileCache
             System.out.println("Exception triggered");
             System.out.println("Message: "+e.getMessage());
         }
-        // return saved HTTP response
+        // return saved HTTP response as byte array
         return data;
+    }
+
+    public String parseRequest(LinkedList<String> request)
+    {
+        // take HTTP request, and parse to obtain
+        // the domain and file path
+        // due to different clients formatting
+        // the request line in different ways,
+        // the http check is required
+        String path = request.get(0);
+        int len = path.length() - 9;
+        if(path.substring(4,9).equals("http:")) {
+            // from browser
+            path = path.substring(11, len); 
+        } else if (path.substring(4,9).equals("https")) {
+            // secure from browser (which this
+            // proxy cannot handle)
+            path = path.substring(12, len); 
+        } else {
+            // from telnet/manual request
+            path = path.substring(4, len);
+            String domain = request.get(1);
+            domain = domain.substring(6);
+            path = domain + path;
+        }
+        return path;
     }
 }

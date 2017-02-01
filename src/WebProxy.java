@@ -16,17 +16,14 @@ public class WebProxy
     private ServerSocket serverSocket;
     private Socket connectedSocket;
     private ProxyClient proxyClient;
-    private PrintWriter outputStream;
     private Scanner inputStream;
     private FileCache cache;
     private BufferedOutputStream byteOutput;
-
 
     public WebProxy(int port)
     {
         connectedSocket = null;
         inputStream = null;
-        outputStream = null;
         cache = new FileCache();
         // initialize server listening port
         serverSocket = null;
@@ -101,11 +98,11 @@ public class WebProxy
                     // send response to original client
                     sendByteClient(response);
                 } else {
-                    printToClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request");
+                    sendStringClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request\r\n");
                 }
             } else {
                 // if invalid request, respond 400
-                    printToClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request");
+                    sendStringClient("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=UTF-8;\r\nConnection: close\r\n\r\n400: Bad Request\r\n");
             }
             // terminate client connection and wait for
             // new client
@@ -117,10 +114,11 @@ public class WebProxy
     {
         try {
             System.out.println("Waiting for new client connection...");
+            // wait for client connection
             connectedSocket = serverSocket.accept();
-            outputStream = new PrintWriter(new OutputStreamWriter(connectedSocket.getOutputStream(),"UTF-8"));
+            // inputStream to receive string from client
             inputStream = new Scanner(connectedSocket.getInputStream(),"UTF-8");
-            // for bytes
+            // byteOutput to send bytes to client
             byteOutput = new BufferedOutputStream(connectedSocket.getOutputStream());
         } catch (Exception e) {
             System.out.println("Socket failed to connect with client");
@@ -133,6 +131,7 @@ public class WebProxy
         while(true) {
             String userInput = "";
             try {
+                // get user input line
                 userInput = inputStream.nextLine();
                 // remove any keep-alive requests
                 // and change to close
@@ -141,21 +140,27 @@ public class WebProxy
                     if(end.equals("keep-alive"))
                         userInput = userInput.substring(0,12) + "close";
                 }
+                // add to request list
                 httpRequest.add(userInput);
+                // print line for reference
                 System.out.println(userInput);
             } catch (Exception e) {
                 System.out.println("No request received, closing connection");
+                // add terminate keyword to trigger
+                // connection close
                 httpRequest.addFirst("terminate");
                 break;
             }
             // if user enters a blank line, this
-            // indicates end of message
+            // indicates end of request
             // if they enter quit, then
             // exit connection
             if(userInput.equals("")) {
                 break;
             } else if(userInput.equals("quit")) {
                 System.out.println("Terminating");
+                // add terminate keyword to trigger
+                // connection close
                 httpRequest.addFirst("terminate");
                 break;
             }
@@ -168,9 +173,11 @@ public class WebProxy
         // if request valid, send to proxy client
         System.out.println("Processing client request...");
 
-        // check that first letters are GET
+        // get first three letters of request
         String firstLine = request.getFirst();
         String getPart = firstLine.substring(0,3);
+        // check that first letters are GET
+        // if not, then invalid
         if(getPart.equals("GET"))
             return true;
         else
@@ -193,6 +200,7 @@ public class WebProxy
 
     public void closeConnection()
     {
+        // closes the clients connection to proxy
         try {
             connectedSocket.close();
         } catch (Exception e) {
@@ -200,14 +208,17 @@ public class WebProxy
         }
     }
 
-    public void printToClient(String message)
+    public void sendStringClient(String message)
     {
-        outputStream.println(message);
-        outputStream.flush();
+        // converts string message to byte array
+        // then sends to client
+        byte[] byteString = message.getBytes();
+        sendByteClient(byteString);
     }
 
     public void sendByteClient(byte[] message)
     {
+        // sends binary data to client
         try {
             byteOutput.write(message);
             byteOutput.flush();
