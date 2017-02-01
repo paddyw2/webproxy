@@ -54,7 +54,6 @@ public class FileCache
         // to file
         String path = parseRequest(request);
         String filepath = System.getProperty("user.dir") + "/" + path;
-        response = forceCloseConnection(response);
         writeFile(filepath, response);
     }
 
@@ -149,46 +148,5 @@ public class FileCache
             path = domain + path;
         }
         return path;
-    }
-
-    public byte[] forceCloseConnection(byte[] response)
-    {
-        System.out.println("Forcing close connection");
-        int breakPoint = 0;
-        for(int i=0;i<response.length;i++)
-        {
-            if(response[i] == '\r' && response[i+1] == '\n' &&
-                    response[i+2] == '\r' && response[i+3] == '\n') {
-                breakPoint = i+4;
-                break;
-             }
-        }
-        int bodySize = response.length - breakPoint;
-        byte[] header = new byte[breakPoint];
-        byte[] body = new byte[bodySize];
-
-        for(int i=0;i<breakPoint;i++) {
-            header[i] = response[i];
-        }
-
-        int counter = 0;
-        for(int i=breakPoint;i<response.length;i++) {
-            body[counter] = response[i];
-            counter++;
-        }
-
-        String headerString = new String(header);
-        String newHeader = headerString.replace("Connection: keep-alive", "Connection: close");
-        header = newHeader.getBytes();
-        byte[] updatedArray = new byte[response.length];
-
-        for(int i=0;i<response.length;i++) {
-            if(i<breakPoint)
-                updatedArray[i] = header[i];
-            else
-                updatedArray[i] = body[i-breakPoint];
-        }
-
-        return updatedArray;
     }
 }
